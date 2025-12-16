@@ -15,8 +15,8 @@ def test_ollama_client_initialization():
 
 def test_ollama_client_custom_model():
     """Test OllamaClient with custom model."""
-    client = OllamaClient(model="llama2")
-    assert client.model == "llama2"
+    client = OllamaClient(model="llama3")
+    assert client.model == "llama3"
 
 
 # Add more tests as needed
