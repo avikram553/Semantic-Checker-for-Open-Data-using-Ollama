@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Similarity Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: rgba(30, 30, 50, 0.8);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --accent-blue: #4f8cff;
+            --accent-purple: #8b5cf6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+            --accent-cyan: #06b6d4;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-group label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        select,
+        input[type="range"] {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            min-width: 200px;
+            cursor: pointer;
+        }
+
+        select:focus,
+        input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .threshold-value {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .algorithm-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .algorithm-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(79, 140, 255, 0.2);
+        }
+
+        .algorithm-card h3 {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .algorithm-card.levenshtein {
+            border-top: 3px solid var(--accent-blue);
+        }
+
+        .algorithm-card.jaro-winkler {
+            border-top: 3px solid var(--accent-purple);
+        }
+
+        .algorithm-card.sbert {
+            border-top: 3px solid var(--accent-green);
+        }
+
+        .algorithm-card.bert-base {
+            border-top: 3px solid var(--accent-cyan);
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .metric {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* Charts Section */
+        .charts-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-card h3 {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Confusion Matrices */
+        .confusion-section {
+            margin-bottom: 3rem;
+        }
+
+        .confusion-section h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .confusion-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+        }
+
+        .confusion-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .confusion-card h4 {
+            text-align: center;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .confusion-matrix {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+
+        .confusion-cell {
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .confusion-cell.tp {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid var(--accent-green);
+        }
+
+        .confusion-cell.fp {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--accent-red);
+        }
+
+        .confusion-cell.fn {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid var(--accent-orange);
+        }
+
+        .confusion-cell.tn {
+            background: rgba(79, 140, 255, 0.2);
+            border: 1px solid var(--accent-blue);
+        }
+
+        .confusion-cell .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .confusion-cell .label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Error Table */
+        .error-section {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 3rem;
+        }
+
+        .error-section h2 {
+            margin-bottom: 1rem;
+        }
+
+        .table-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .table-controls select {
+            min-width: 150px;
+        }
+
+        .error-table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-secondary);
+            position: sticky;
+            top: 0;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge.tp {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+        }
+
+        .badge.fp {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+
+        .badge.fn {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-orange);
+        }
+
+        .badge.tn {
+            background: rgba(79, 140, 255, 0.2);
+            color: var(--accent-blue);
+        }
+
+        .category-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            background: var(--glass-bg);
+            color: var(--text-secondary);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 4rem;
+            color: var(--text-secondary);
+        }
+
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+
+            0%,
+            20% {
+                content: '.';
+            }
+
+            40% {
+                content: '..';
+            }
+
+            60%,
+            100% {
+                content: '...';
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+
+            .summary-grid,
+            .confusion-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+
+            .summary-grid,
+            .confusion-grid,
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            header h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🔬 Semantic Similarity Analysis Dashboard</h1>
+            <p>Interactive comparison of similarity algorithms on Open Data attribute pairs</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Algorithm for prediction</label>
+                <select id="algorithmSelect">
+                    <option value="sbert">SBERT (Multilingual)</option>
+                    <option value="bert_base">BERT Base</option>
+                    <option value="levenshtein">Levenshtein</option>
+                    <option value="jaro_winkler">Jaro-Winkler</option>
+                    <option value="llama_cot">Llama 3.1 (CoT)</option>
+                    <option value="llama_fewshot">Llama 3.1 (Few-shot)</option>
+                    <option value="llama_zeroshot">Llama 3.1 (Zero-shot)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Threshold: <span id="thresholdValue" class="threshold-value">0.50</span></label>
+                <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0.5">
+            </div>
+            <div class="control-group">
+                <label>Category Filter</label>
+                <select id="categoryFilter">
+                    <option value="all">All Categories</option>
+                    <option value="demographics">Demographics</option>
+                    <option value="address">Address</option>
+                    <option value="geo">Geographic</option>
+                    <option value="time">Time</option>
+                    <option value="mixed">Mixed (Negatives)</option>
+                </select>
+            </div>
+            <div class="control-group"
+                style="flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+                <input type="checkbox" id="subsetFilter" style="min-width: auto; margin:0;">
+                <label for="subsetFilter" style="margin:0; cursor:pointer; color: var(--text-primary);">Compare on Llama
+                    Sample (N=100)</label>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">Loading data</div>
+
+        <div id="dashboard" style="display: none;">
+            <!-- Summary Cards -->
+            <div class="summary-grid">
+                <div class="algorithm-card sbert">
+                    <h3>SBERT</h3>
+                    <div class="metric-grid" id="sbert-metrics"></div>
+                </div>
+                <div class="algorithm-card bert-base">
+                    <h3>BERT Base</h3>
+                    <div class="metric-grid" id="bert_base-metrics"></div>
+                </div>
+                <div class="algorithm-card levenshtein">
+                    <h3>Llama 3.1 (CoT)</h3>
+                    <div class="metric-grid" id="llama_cot-metrics"></div>
+                </div>
+                <div class="algorithm-card jaro-winkler">
+                    <h3>Llama 3.1 (Few-Shot)</h3>
+                    <div class="metric-grid" id="llama_fewshot-metrics"></div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-section">
+                <div class="chart-card">
+                    <h3>📊 F1-Score by Category</h3>
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>📈 Algorithm Comparison</h3>
+                    <div class="chart-container">
+                        <canvas id="comparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confusion Matrices -->
+            <div class="confusion-section">
+                <h2>🎯 Confusion Matrices</h2>
+                <div class="confusion-grid">
+                    <div class="confusion-card">
+                        <h4>SBERT</h4>
+                        <div class="confusion-matrix" id="confusion-sbert"></div>
+                    </div>
+                    <div class="confusion-card">
+                        <h4>BERT Base</h4>
+                        <div class="confusion-matrix" id="confusion-bert_base"></div>
+                    </div>
+                    <div class="confusion-card">
+                        <h4>Llama 3.1 (CoT)</h4>
+                        <div class="confusion-matrix" id="confusion-llama_cot"></div>
+                    </div>
+                    <div class="confusion-card">
+                        <h4>Llama 3.1 (Zero-Shot)</h4>
+                        <div class="confusion-matrix" id="confusion-llama_zeroshot"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Table -->
+            <div class="error-section">
+                <h2>🔍 Prediction Results</h2>
+                <div class="table-controls">
+                    <select id="resultTypeFilter">
+                        <option value="all">All Results</option>
+                        <option value="fp">False Positives Only</option>
+                        <option value="fn">False Negatives Only</option>
+                        <option value="tp">True Positives Only</option>
+                        <option value="tn">True Negatives Only</option>
+                    </select>
+                </div>
+                <div class="error-table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Attribute 1</th>
+                                <th>Attribute 2</th>
+                                <th>Category</th>
+                                <th>SBERT</th>
+                                <th>Llama CoT</th>
+                                <th>Actual</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="errorTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let data = [];
+        let categoryChart = null;
+        let comparisonChart = null;
+
+        // Parse CSV
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',');
+            return lines.slice(1).map(line => {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (let char of line) {
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim());
+
+                const obj = {};
+                headers.forEach((h, i) => {
+                    const key = h.trim();
+                    let val = values[i] || '';
+                    if (val === 'True') val = true;
+                    else if (val === 'False') val = false;
+                    else if (!isNaN(val) && val !== '') val = parseFloat(val);
+                    obj[key] = val;
+                });
+                return obj;
+            });
+        }
+
+        // Calculate metrics
+        function calculateMetrics(data, algorithm, threshold, category = 'all', useSubset = false) {
+            let filtered = data;
+
+            // Category Filter
+            if (category !== 'all') {
+                filtered = filtered.filter(d => d.Category === category);
+            }
+
+            // Subset Filter (Intersection with Llama sample)
+            if (useSubset || algorithm.startsWith('llama')) {
+                filtered = filtered.filter(d => d.hasLlama);
+            }
+
+            const simKey = algorithm.startsWith('llama') ? algorithm : algorithm + '_similarity';
+
+            let tp = 0, fp = 0, tn = 0, fn = 0;
+
+            filtered.forEach(row => {
+                let predicted;
+                if (algorithm.startsWith('llama')) {
+                    // Llama results are binary 0/1
+                    predicted = row[simKey] === 1;
+                } else {
+                    // Baseline results are floats 0.0-1.0
+                    predicted = row[simKey] >= threshold;
+                }
+
+                const actual = row.Match === true;
+
+                if (predicted && actual) tp++;
+                else if (predicted && !actual) fp++;
+                else if (!predicted && actual) fn++;
+                else tn++;
+            });
+
+            const total = tp + tn + fp + fn;
+            if (total === 0) return { tp: 0, fp: 0, tn: 0, fn: 0, accuracy: 0, precision: 0, recall: 0, f1: 0 };
+
+            const accuracy = (tp + tn) / total;
+            const precision = tp / (tp + fp) || 0;
+            const recall = tp / (tp + fn) || 0;
+            const f1 = 2 * (precision * recall) / (precision + recall) || 0;
+
+            return { tp, fp, tn, fn, accuracy, precision, recall, f1 };
+        }
+
+        // Render metrics card
+        function renderMetrics(algorithm, metrics, elementId) {
+            const container = document.getElementById(elementId);
+            if (!container) return;
+            container.innerHTML = `
+                <div class="metric">
+                    <div class="metric-value" style="color: var(--accent-green)">${(metrics.accuracy * 100).toFixed(1)}%</div>
+                    <div class="metric-label">Accuracy</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" style="color: var(--accent-blue)">${(metrics.precision * 100).toFixed(1)}%</div>
+                    <div class="metric-label">Precision</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" style="color: var(--accent-purple)">${(metrics.recall * 100).toFixed(1)}%</div>
+                    <div class="metric-label">Recall</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" style="color: var(--accent-cyan)">${(metrics.f1 * 100).toFixed(1)}%</div>
+                    <div class="metric-label">F1-Score</div>
+                </div>
+            `;
+        }
+
+        // Render confusion matrix
+        function renderConfusionMatrix(algorithm, metrics, elementId) {
+            const container = document.getElementById(elementId);
+            if (!container) return;
+            container.innerHTML = `
+                <div class="confusion-cell tp">
+                    <div class="value">${metrics.tp}</div>
+                    <div class="label">True Positive</div>
+                </div>
+                <div class="confusion-cell fp">
+                    <div class="value">${metrics.fp}</div>
+                    <div class="label">False Positive</div>
+                </div>
+                <div class="confusion-cell fn">
+                    <div class="value">${metrics.fn}</div>
+                    <div class="label">False Negative</div>
+                </div>
+                <div class="confusion-cell tn">
+                    <div class="value">${metrics.tn}</div>
+                    <div class="label">True Negative</div>
+                </div>
+            `;
+        }
+
+        // Render category chart
+        function renderCategoryChart(threshold, useSubset) {
+            const categories = ['demographics', 'address', 'geo', 'time', 'mixed'];
+            // Comparing top contenders
+            const algorithms = ['sbert', 'bert_base', 'llama_cot', 'llama_fewshot'];
+            const colors = ['#10b981', '#06b6d4', '#f59e0b', '#8b5cf6'];
+
+            const datasets = algorithms.map((alg, i) => ({
+                label: alg.replace('_', ' ').replace('cot', 'CoT').toUpperCase(),
+                data: categories.map(cat => calculateMetrics(data, alg, threshold, cat, useSubset).f1 * 100),
+                backgroundColor: colors[i],
+                borderRadius: 5
+            }));
+
+            if (categoryChart) categoryChart.destroy();
+
+            categoryChart = new Chart(document.getElementById('categoryChart'), {
+                type: 'bar',
+                data: {
+                    labels: categories.map(c => c.charAt(0).toUpperCase() + c.slice(1)),
+                    datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#a0a0b0' } },
+                        title: { display: true, text: 'F1-Score by Category', color: '#a0a0b0' }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#a0a0b0' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: {
+                            ticks: { color: '#a0a0b0', callback: v => v + '%' },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render comparison chart
+        function renderComparisonChart(threshold, category, useSubset) {
+            const algorithms = ['levenshtein', 'sbert', 'bert_base', 'llama_cot', 'llama_zeroshot'];
+            const metrics = algorithms.map(alg => calculateMetrics(data, alg, threshold, category, useSubset));
+            const colors = ['#4f8cff', '#10b981', '#06b6d4', '#f59e0b', '#8b5cf6'];
+
+            if (comparisonChart) comparisonChart.destroy();
+
+            comparisonChart = new Chart(document.getElementById('comparisonChart'), {
+                type: 'radar',
+                data: {
+                    labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+                    datasets: algorithms.map((alg, i) => ({
+                        label: alg.replace('_', ' ').replace('cot', 'CoT').toUpperCase(),
+                        data: [
+                            metrics[i].accuracy * 100,
+                            metrics[i].precision * 100,
+                            metrics[i].recall * 100,
+                            metrics[i].f1 * 100
+                        ],
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
+                        pointBackgroundColor: colors[i]
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#a0a0b0' } }
+                    },
+                    scales: {
+                        r: {
+                            ticks: { color: '#a0a0b0', backdropColor: 'transparent' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            pointLabels: { color: '#a0a0b0' },
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render error table
+        function renderErrorTable(algorithm, threshold, category, resultType, useSubset) {
+            const simKey = algorithm.startsWith('llama') ? algorithm : algorithm + '_similarity';
+
+            let filtered = data;
+            if (category !== 'all') filtered = filtered.filter(d => d.Category === category);
+            if (useSubset || algorithm.startsWith('llama')) filtered = filtered.filter(d => d.hasLlama);
+
+            // Add result type
+            filtered = filtered.map(row => {
+                let predicted;
+                if (algorithm.startsWith('llama')) predicted = row[simKey] === 1;
+                else predicted = row[simKey] >= threshold;
+
+                const actual = row.Match === true;
+                let type = '';
+                if (predicted && actual) type = 'tp';
+                else if (predicted && !actual) type = 'fp';
+                else if (!predicted && actual) type = 'fn';
+                else type = 'tn';
+                return { ...row, resultType: type };
+            });
+
+            // Filter by result type
+            if (resultType !== 'all') {
+                filtered = filtered.filter(d => d.resultType === resultType);
+            }
+
+            filtered = filtered.slice(0, 100);
+
+            const tbody = document.getElementById('errorTableBody');
+            tbody.innerHTML = filtered.map(row => `
+                <tr>
+                    <td>${row.Attribute1}</td>
+                    <td>${row.Attribute2}</td>
+                    <td><span class="category-badge">${row.Category}</span></td>
+                    <td>${row.sbert_similarity?.toFixed(2) || '-'}</td>
+                    <td>${row.hasLlama ? (row.llama_cot === 1 ? 'Match' : 'No') : '-'}</td>
+                    <td>${row.Match ? '✓ Match' : '✗ No Match'}</td>
+                    <td><span class="badge ${row.resultType}">${row.resultType.toUpperCase()}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        // Update dashboard
+        function updateDashboard() {
+            const algorithm = document.getElementById('algorithmSelect').value;
+            const threshold = parseFloat(document.getElementById('thresholdSlider').value);
+            const category = document.getElementById('categoryFilter').value;
+            const resultType = document.getElementById('resultTypeFilter').value;
+            const useSubset = document.getElementById('subsetFilter').checked;
+
+            document.getElementById('thresholdValue').textContent = threshold.toFixed(2);
+
+            // Update Cards (Display Top 4 interesting comparisons)
+            const cardConfigs = [
+                { alg: 'sbert', id: 'sbert-metrics', confId: 'confusion-sbert' },
+                { alg: 'bert_base', id: 'bert_base-metrics', confId: 'confusion-bert_base' },
+                { alg: 'llama_cot', id: 'llama_cot-metrics', confId: 'confusion-llama_cot' },
+                { alg: 'llama_fewshot', id: 'llama_fewshot-metrics', confId: 'confusion-llama_zeroshot' } // reusing slot
+            ];
+
+            cardConfigs.forEach(cfg => {
+                const metrics = calculateMetrics(data, cfg.alg, threshold, category, useSubset);
+                renderMetrics(cfg.alg, metrics, cfg.id);
+                renderConfusionMatrix(cfg.alg, metrics, cfg.confId);
+            });
+
+            renderCategoryChart(threshold, useSubset);
+            renderComparisonChart(threshold, category, useSubset);
+            renderErrorTable(algorithm, threshold, category, resultType, useSubset);
+        }
+
+        // Load data and initialize
+        async function init() {
+            try {
+                // Fetch both CSVs in parallel
+                const [baseResponse, llamaResponse] = await Promise.all([
+                    fetch('data/1200_stress_all_baselines_results.csv'),
+                    fetch('data/llama_quick_results.csv')
+                ]);
+
+                const baseText = await baseResponse.text();
+                const llamaText = await llamaResponse.text();
+
+                const baseData = parseCSV(baseText);
+                const llamaData = parseCSV(llamaText);
+
+                // Index Llama data by ID for fast lookup
+                const llamaMap = {};
+                llamaData.forEach(row => {
+                    llamaMap[row.ID] = row;
+                });
+
+                // Merge Llama data into baseData
+                data = baseData.map(row => {
+                    if (llamaMap[row.ID]) {
+                        return {
+                            ...row,
+                            ...llamaMap[row.ID], // Adds llama_zeroshot, llama_fewshot, llama_cot
+                            hasLlama: true
+                        };
+                    }
+                    return { ...row, hasLlama: false };
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+
+                updateDashboard();
+
+                // Event listeners
+                document.getElementById('algorithmSelect').addEventListener('change', updateDashboard);
+                document.getElementById('thresholdSlider').addEventListener('input', updateDashboard);
+                document.getElementById('categoryFilter').addEventListener('change', updateDashboard);
+                document.getElementById('resultTypeFilter').addEventListener('change', updateDashboard);
+                document.getElementById('subsetFilter').addEventListener('change', updateDashboard);
+
+            } catch (error) {
+                document.getElementById('loading').textContent = 'Error loading data: ' + error.message;
+                console.error(error);
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
