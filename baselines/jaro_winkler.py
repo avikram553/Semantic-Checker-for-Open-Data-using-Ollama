@@ -1,12 +1,10 @@
-
-
+import argparse
 import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
 
-# Add parent directory to path to allow importing utils
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from utils.string_matching import jaro_similarity, jaro_winkler_similarity
 from utils.data_loader import load_pair_data
@@ -46,14 +44,14 @@ def analyze_pairs(data_file: str, output_csv: str = "data/jaro_winkler_results.c
         jaro_winkler_case = jaro_winkler_similarity(attr1, attr2)
         
         results.append({
-            'id': row['ID'],
-            'attribute1': attr1,
-            'attribute2': attr2,
-            'match': row['Match'],
-            'confidence': row.get('Confidence', 'unknown'),
-            'category': row.get('Category', 'unknown'),
-            'type': row.get('Type', 'unknown'),
-            'reasoning': row.get('Reasoning', ''),
+            'ID': row['ID'],
+            'Attribute1': attr1,
+            'Attribute2': attr2,
+            'Match': row['Match'],
+            'Confidence': row.get('Confidence', 'unknown'),
+            'Category': row.get('Category', 'unknown'),
+            'Type': row.get('Type', 'unknown'),
+            'Reasoning': row.get('Reasoning', ''),
             'jaro_similarity': round(jaro, 4),
             'jaro_winkler_similarity': round(jaro_winkler, 4),
             'jaro_case_sensitive': round(jaro_case, 4),
@@ -64,13 +62,13 @@ def analyze_pairs(data_file: str, output_csv: str = "data/jaro_winkler_results.c
         })
     
     df = pd.DataFrame(results)
-    df = df.sort_values('id').reset_index(drop=True)
+    df = df.sort_values('ID').reset_index(drop=True)
     
     print(f"\nSaving results to: {output_csv}")
     df.to_csv(output_csv, index=False, encoding='utf-8')
     
     # Calculate metrics
-    metrics = calculate_metrics(df, 'jaro_winkler_similarity', threshold=0.5)
+    metrics = calculate_metrics(df, 'jaro_winkler_similarity', threshold=0.85)
     
     print("\n" + "=" * 80)
     print("JARO-WINKLER SIMILARITY STATISTICS")
@@ -85,12 +83,12 @@ def analyze_pairs(data_file: str, output_csv: str = "data/jaro_winkler_results.c
     print(f"  Std dev Jaro-Winkler similarity: {df['jaro_winkler_similarity'].std():.4f}")
     print()
     
-    print(f"Metrics (Threshold=0.5): F1: {metrics['F1']:.2f}%, Accuracy: {metrics['Accuracy']:.2f}%")
+    print(f"Metrics (Threshold=0.85): F1: {metrics['F1']:.2f}%, Accuracy: {metrics['Accuracy']:.2f}%")
     print()
     
     print("Statistics by Match Status:")
     for match_status in [True, False]:
-        subset = df[df['match'] == match_status]
+        subset = df[df['Match'] == match_status]
         label = "MATCHING PAIRS (True)" if match_status else "NON-MATCHING PAIRS (False)"
         print(f"\n  {label}:")
         print(f"    Count: {len(subset)}")
@@ -101,53 +99,53 @@ def analyze_pairs(data_file: str, output_csv: str = "data/jaro_winkler_results.c
         print(f"    Median similarity: {subset['jaro_winkler_similarity'].median():.4f}")
     
     print("\n\nStatistics by Category:")
-    category_stats = df.groupby('category').agg({
+    category_stats = df.groupby('Category').agg({
         'jaro_winkler_similarity': ['count', 'mean', 'std', 'min', 'max'],
         'jaro_similarity': 'mean'
     }).round(4)
     print(category_stats)
     
     print("\n\nStatistics by Type:")
-    type_stats = df.groupby('type').agg({
+    type_stats = df.groupby('Type').agg({
         'jaro_winkler_similarity': ['count', 'mean', 'std'],
         'jaro_similarity': 'mean'
     }).round(4)
     print(type_stats)
     
     print("\n\nStatistics by Confidence:")
-    confidence_stats = df.groupby('confidence').agg({
+    confidence_stats = df.groupby('Confidence').agg({
         'jaro_winkler_similarity': ['count', 'mean', 'std'],
-        'match': 'sum'
+        'Match': 'sum'
     }).round(4)
     print(confidence_stats)
     
     print("\n\n" + "=" * 80)
     print("TOP 10 HIGHEST SIMILARITY (by Jaro-Winkler)")
     print("=" * 80)
-    top_similar = df.nlargest(10, 'jaro_winkler_similarity')[['attribute1', 'attribute2', 'match', 'jaro_winkler_similarity', 'category', 'type']]
+    top_similar = df.nlargest(10, 'jaro_winkler_similarity')[['Attribute1', 'Attribute2', 'Match', 'jaro_winkler_similarity', 'Category', 'Type']]
     print(top_similar.to_string(index=False))
     
     print("\n\n" + "=" * 80)
     print("TOP 10 LOWEST SIMILARITY (by Jaro-Winkler)")
     print("=" * 80)
-    top_dissimilar = df.nsmallest(10, 'jaro_winkler_similarity')[['attribute1', 'attribute2', 'match', 'jaro_winkler_similarity', 'category', 'type']]
+    top_dissimilar = df.nsmallest(10, 'jaro_winkler_similarity')[['Attribute1', 'Attribute2', 'Match', 'jaro_winkler_similarity', 'Category', 'Type']]
     print(top_dissimilar.to_string(index=False))
     
     print("\n\n" + "=" * 80)
     print("CHALLENGING MATCHES (True matches with LOW Jaro-Winkler similarity)")
     print("=" * 80)
-    challenging = df[(df['match'] == True) & (df['jaro_winkler_similarity'] < 0.7)].nsmallest(10, 'jaro_winkler_similarity')
+    challenging = df[(df['Match'] == True) & (df['jaro_winkler_similarity'] < 0.7)].nsmallest(10, 'jaro_winkler_similarity')
     if len(challenging) > 0:
-        print(challenging[['attribute1', 'attribute2', 'jaro_winkler_similarity', 'category', 'reasoning']].to_string(index=False))
+        print(challenging[['Attribute1', 'Attribute2', 'jaro_winkler_similarity', 'Category', 'Reasoning']].to_string(index=False))
     else:
         print("No challenging matches found (all true matches have similarity >= 0.7)")
     
     print("\n\n" + "=" * 80)
     print("FALSE FRIENDS (Non-matches with HIGH Jaro-Winkler similarity)")
     print("=" * 80)
-    false_friends = df[(df['match'] == False) & (df['jaro_winkler_similarity'] > 0.7)].nlargest(10, 'jaro_winkler_similarity')
+    false_friends = df[(df['Match'] == False) & (df['jaro_winkler_similarity'] > 0.7)].nlargest(10, 'jaro_winkler_similarity')
     if len(false_friends) > 0:
-        print(false_friends[['attribute1', 'attribute2', 'jaro_winkler_similarity', 'category', 'reasoning']].to_string(index=False))
+        print(false_friends[['Attribute1', 'Attribute2', 'jaro_winkler_similarity', 'Category', 'Reasoning']].to_string(index=False))
     else:
         print("No false friends found (all non-matches have similarity <= 0.7)")
     
@@ -165,10 +163,10 @@ def analyze_pairs(data_file: str, output_csv: str = "data/jaro_winkler_results.c
     for threshold in thresholds:
         df['predicted'] = df['jaro_winkler_similarity'] >= threshold
         
-        tp = len(df[(df['predicted'] == True) & (df['match'] == True)])
-        fp = len(df[(df['predicted'] == True) & (df['match'] == False)])
-        tn = len(df[(df['predicted'] == False) & (df['match'] == False)])
-        fn = len(df[(df['predicted'] == False) & (df['match'] == True)])
+        tp = len(df[(df['predicted'] == True) & (df['Match'] == True)])
+        fp = len(df[(df['predicted'] == True) & (df['Match'] == False)])
+        tn = len(df[(df['predicted'] == False) & (df['Match'] == False)])
+        fn = len(df[(df['predicted'] == False) & (df['Match'] == True)])
         
         accuracy = (tp + tn) / len(df) if len(df) > 0 else 0
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
@@ -181,9 +179,9 @@ def analyze_pairs(data_file: str, output_csv: str = "data/jaro_winkler_results.c
     best_threshold = 0
     for threshold in np.arange(0.5, 1.0, 0.01):
         df['predicted'] = df['jaro_winkler_similarity'] >= threshold
-        tp = len(df[(df['predicted'] == True) & (df['match'] == True)])
-        fp = len(df[(df['predicted'] == True) & (df['match'] == False)])
-        fn = len(df[(df['predicted'] == False) & (df['match'] == True)])
+        tp = len(df[(df['predicted'] == True) & (df['Match'] == True)])
+        fp = len(df[(df['predicted'] == True) & (df['Match'] == False)])
+        fn = len(df[(df['predicted'] == False) & (df['Match'] == True)])
         
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
@@ -203,7 +201,6 @@ def analyze_pairs(data_file: str, output_csv: str = "data/jaro_winkler_results.c
     
     return df
 
-import argparse
 
 def main():
     script_dir = Path(__file__).resolve().parent

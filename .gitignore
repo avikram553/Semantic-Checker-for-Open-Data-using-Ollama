@@ -1,3 +1,7 @@
+# ============================================
+# Semantic Checker Project - .gitignore
+# ============================================
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -5,6 +9,36 @@ __pycache__/
 
 # C extensions
 *.so
+
+# ============================================
+# Project-Specific
+# ============================================
+
+# Large result files (track only summary/reports)
+results/experiments/**/*.csv
+results/baselines/**/*.csv
+!results/**/*_summary.csv
+
+# Temporary analysis files
+results/temp/
+*.tmp
+
+# Large datasets (track only ground truth)
+datasets/generated/**/*.csv
+datasets/samples/**/*.csv
+!datasets/ground_truth/*.csv
+
+# Model cache
+.cache/
+models/cache/
+*.bin
+*.pt
+*.safetensors
+
+# Logs (track only important logs in docs/logs)
+*.log
+logs/*.txt
+!docs/logs/*.md
 
 # Distribution / packaging
 .Python

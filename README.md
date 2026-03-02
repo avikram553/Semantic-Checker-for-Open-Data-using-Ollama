@@ -1,223 +1,212 @@
-# Semantic Checker
+# Semantic Checker for Open Data
 
-A Python-based semantic checker using local LLM (Ollama with Llama 3.1 8B) for semantic similarity analysis.
+A benchmarking tool that evaluates six methods for detecting semantic
+equivalence between attribute names from Saxon Open Data portals.
 
-## Features
+**Methods compared:**
+- Levenshtein Distance
+- Jaro-Winkler Similarity
+- Sentence-BERT (multilingual)
+- Ollama `llama3.1:8b` — Zero-Shot, Few-Shot, Chain-of-Thought
 
-- **Local LLM Integration**: Uses Ollama with Llama 3.1 8B for semantic analysis
-- **CSV Data Processing**: Load and process text pairs from CSV files
-- **Batch Analysis**: Analyze multiple text pairs efficiently
-- **Evaluation Metrics**: Calculate accuracy, precision, recall, and F1-score
-- **Embedding Support**: Optional sentence-transformers for baseline comparison
+All LLM inference runs fully on-premise via Ollama (no external API calls).
 
-## Technology Stack
+---
 
-- **Python 3.11+**: Main programming language
-- **Ollama 0.3.x**: Local LLM runtime
-- **Llama 3.1 8B**: Primary language model
-- **pandas 2.1+**: Data manipulation and CSV parsing
-- **sentence-transformers**: Embedding-based baseline
-- **scikit-learn**: Evaluation metrics
-- **requests**: Ollama API communication
+## Workflow
+
+```
+1. User creates / maintains ground-truth CSV
+         ↓
+2. Sample a balanced test set from ground truth
+         ↓
+3. Run all 6 methods on the test set
+         ↓
+4. Compare results (CSV + metrics printed to terminal)
+```
+
+---
 
 ## Prerequisites
 
-1. **Python 3.11 or higher** installed on your system
-2. **Ollama** installed and running locally
-   - Install from: https://ollama.ai
-   - Pull Llama 3.1 8B model: `ollama pull llama3.1:8b`
+1. **Python 3.11+**
+2. **Ollama** running locally with `llama3.1:8b` pulled
+   ```bash
+   ollama serve            # start server (keep running in background)
+   ollama pull llama3.1:8b # first-time download (~4.9 GB)
+   ```
+
+---
 
 ## Installation
 
-1. Clone or navigate to the repository:
 ```bash
-cd /path/to/Semantic_Checker
-```
-
-2. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On macOS/Linux
-# or
-venv\Scripts\activate  # On Windows
-```
-
-3. Install dependencies:
-```bash
+cd Semantic_Checker
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+---
 
 ## Project Structure
 
 ```
 Semantic_Checker/
-├── src/
-│   ├── __init__.py
-│   ├── ollama_client.py      # Ollama API client
-│   ├── semantic_analyzer.py   # Main semantic analysis logic
-│   ├── data_processor.py      # CSV data handling
-│   └── evaluator.py           # Performance evaluation
-├── tests/                     # Unit tests
-├── data/                      # Data files
-├── config/                    # Configuration files
-├── main.py                    # Main entry point
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+├── main.py                        # CLI entry point (all commands)
+├── run_all_baselines_csv.py       # Core benchmark runner
+├── prepare_test_with_gt.py        # Legacy join helper
+├── requirements.txt
+│
+├── baselines/
+│   ├── levenshtein.py
+│   ├── jaro_winkler.py
+│   ├── sbert.py
+│   └── ollama_prompting.py
+│
+├── utils/
+│   ├── ground_truth_loader.py     # Load & validate ground-truth CSV
+│   ├── stratified_sampler.py      # Sample balanced test sets
+│   ├── data_loader.py             # Generic CSV loader for baselines
+│   ├── evaluation.py              # Precision / Recall / F1
+│   └── string_matching.py        # Levenshtein & Jaro-Winkler helpers
+│
+├── datasets/
+│   ├── ground_truth/              # Manually annotated ground-truth corpora
+│   │   ├── de_de_ground_truth.csv
+│   │   ├── en_en_ground_truth.csv
+│   │   └── mixed_ground_truth.csv
+│   └── samples/test/              # Sampled test sets (output of Step 2)
+│       ├── test_de_de.csv
+│       ├── test_en_en.csv
+│       └── test_mixed.csv
+│
+└── results/
+    └── experiments/               # Output of Step 3
 ```
 
-## Usage
+---
 
-### Starting Ollama
+## Ground-Truth CSV Format
 
-Before running the semantic checker, ensure Ollama is running:
+The ground-truth file is the **only required input** — no raw Open Data files
+are needed. Create or maintain it manually.
+
+| Column      | Required | Type    | Description                                      |
+|-------------|----------|---------|--------------------------------------------------|
+| Attribute1  | ✅       | string  | First attribute name                             |
+| Attribute2  | ✅       | string  | Second attribute name                            |
+| Match       | ✅       | boolean | `True` = semantically equivalent, `False` = not |
+| Category    | optional | string  | Difficulty stratum (see below)                   |
+| Confidence  | optional | string  | Annotation confidence: high / medium / low       |
+| Reasoning   | optional | string  | Human annotation note                            |
+
+**Recommended Category values:**
+
+| Category           | Example                                         |
+|--------------------|-------------------------------------------------|
+| `easy_positive`    | `Straße` / `Strasse`                            |
+| `conceptual_paraphrase` | `Sterbefälle` / `Todesfälle`              |
+| `abbreviation`     | `PLZ` / `PostalCode`                            |
+| `hard_negative`    | `Grundsteuer` / `Gewerbesteuer`                 |
+| `toughest_negative`| `Bevölkerung` / `Bevölkerungsdichte`            |
+
+---
+
+## Step-by-Step Usage
+
+### Step 1 — (One-off) Prepare ground truth
+
+Edit or create a ground-truth CSV in `datasets/ground_truth/`.  
+No code changes required — just a CSV file.
+
+### Step 2 — Sample a test set
 
 ```bash
-ollama serve
+python main.py sample \
+    datasets/ground_truth/de_de_ground_truth.csv \
+    datasets/samples/test/test_de_de.csv \
+    --n-positive 10 --n-negative 10 --seed 42
 ```
 
-In another terminal, verify the model is available:
+Options:
+- `--n-positive` / `-p`  — number of positive pairs (default: 10)
+- `--n-negative` / `-n`  — number of negative pairs (default: 10)
+- `--seed` / `-s`        — random seed for reproducibility (default: 42)
+
+### Step 3 — Run all baselines (string methods only)
 
 ```bash
-ollama pull llama3.1:8b
+python main.py run-all \
+    datasets/samples/test/test_de_de.csv \
+    --output results/experiments/test_run_de_de
 ```
 
-### Creating Sample Data
-
-Create a sample CSV file with text pairs:
-
-```python
-from src.data_processor import DataProcessor
-
-processor = DataProcessor("data/sample.csv")
-processor.create_sample_data("data/sample.csv", num_samples=10)
-```
-
-### Running Semantic Analysis
+### Step 3b — Run all baselines including Ollama
 
 ```bash
-python main.py --input data/sample.csv --output results.csv --mode analyze
+python main.py run-all \
+    datasets/samples/test/test_de_de.csv \
+    --output results/experiments/test_run_de_de \
+    --ollama
 ```
 
-### Command Line Arguments
-
-- `--input`: Path to input CSV file (required)
-- `--output`: Path to output CSV file (default: results.csv)
-- `--model`: Ollama model to use (default: llama3.1:8b)
-- `--mode`: Operation mode - `analyze`, `evaluate`, or `both` (default: both)
-
-### Input CSV Format
-
-Your input CSV should have at least these columns:
-- `text1`: First text in the pair
-- `text2`: Second text in the pair
-- `label`: (Optional) True label for evaluation (SIMILAR or DIFFERENT)
-
-Example:
-```csv
-text1,text2,label
-"The cat sat on the mat","A feline rested on the rug",SIMILAR
-"I love programming","The weather is nice",DIFFERENT
-```
-
-## API Usage
-
-```python
-from src.ollama_client import OllamaClient
-from src.semantic_analyzer import SemanticAnalyzer
-
-# Initialize client
-client = OllamaClient(model="llama3.1:8b")
-
-# Create analyzer
-analyzer = SemanticAnalyzer(client)
-
-# Analyze a pair
-result = analyzer.analyze_pair(
-    "The cat sat on the mat",
-    "A feline rested on the rug"
-)
-
-print(result['prediction'])  # SIMILAR or DIFFERENT
-print(result['explanation'])  # LLM explanation
-```
-
-## Development
-
-### Running Tests
+### Run a single baseline
 
 ```bash
-pytest tests/
+# Sentence-BERT only
+python main.py baseline sbert \
+    datasets/samples/test/test_de_de.csv \
+    results/experiments/sbert/de_de.csv
+
+# Ollama few-shot only
+python main.py baseline ollama-fewshot \
+    datasets/samples/test/test_de_de.csv \
+    results/experiments/ollama/de_de_fewshot.csv
 ```
 
-### Code Formatting
+Available methods: `levenshtein`, `jaro-winkler`, `sbert`,
+`ollama`, `ollama-zeroshot`, `ollama-fewshot`, `ollama-cot`
+
+---
+
+## Reproducing the Paper Results
 
 ```bash
-black src/ tests/
+# DE-DE
+python main.py sample datasets/ground_truth/de_de_ground_truth.csv \
+    datasets/samples/test/test_de_de.csv --seed 42
+python main.py run-all datasets/samples/test/test_de_de.csv \
+    --output results/experiments/test_run_de_de --ollama
+
+# EN-EN
+python main.py sample datasets/ground_truth/en_en_ground_truth.csv \
+    datasets/samples/test/test_en_en.csv --seed 42
+python main.py run-all datasets/samples/test/test_en_en.csv \
+    --output results/experiments/test_run_en_en --ollama
+
+# Mixed
+python main.py sample datasets/ground_truth/mixed_ground_truth.csv \
+    datasets/samples/test/test_mixed.csv --seed 42
+python main.py run-all datasets/samples/test/test_mixed.csv \
+    --output results/experiments/test_run_mixed --ollama
 ```
 
-### Linting
-
-```bash
-flake8 src/ tests/
-mypy src/
-```
-
-## Configuration
-
-Environment variables can be set in a `.env` file:
-
-```
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.1:8b
-```
-
-## Evaluation Metrics
-
-The evaluator calculates:
-- **Accuracy**: Overall correctness
-- **Precision**: Positive predictive value
-- **Recall**: Sensitivity
-- **F1-Score**: Harmonic mean of precision and recall
-- **Confusion Matrix**: Detailed prediction breakdown
+---
 
 ## Troubleshooting
 
-### Ollama Not Running
-```
-Error: Ollama is not running. Please start Ollama first.
-```
-**Solution**: Start Ollama with `ollama serve`
+| Error | Solution |
+|-------|----------|
+| `Ollama is not running` | Run `ollama serve` in a separate terminal |
+| `Model not found` | Run `ollama pull llama3.1:8b` |
+| `Missing column 'Match'` | Add a `Match` column (True/False) to your ground-truth CSV |
+| `ModuleNotFoundError` | Run `pip install -r requirements.txt` inside the `.venv` |
 
-### Model Not Found
-```
-Error: Model not found
-```
-**Solution**: Pull the model with `ollama pull llama3.1:8b`
+---
 
-### Import Errors
-```
-ModuleNotFoundError: No module named 'pandas'
-```
-**Solution**: Install dependencies with `pip install -r requirements.txt`
+## Environment Variables
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
-
-## License
-
-MIT License
-
-## Contact
-
-For questions or issues, please open an issue on the repository.
-
-## Acknowledgments
-
-- Ollama team for the local LLM runtime
-- Meta AI for Llama 3.1
-- Sentence-Transformers team for embedding models
+| Variable       | Default           | Description                   |
+|----------------|-------------------|-------------------------------|
+| `OLLAMA_MODEL` | `llama3.1:8b`     | Override the Ollama model name |

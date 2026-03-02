@@ -1,15 +1,16 @@
-
-
+import argparse
 import sys
+import warnings
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import warnings
+
 warnings.filterwarnings('ignore')
 
-# Add parent directory to path to allow importing utils
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from utils.data_loader import load_pair_data
@@ -72,14 +73,14 @@ def analyze_pairs(data_file: str, output_csv: str = "data/sbert_results.csv",
         sbert_similarity_lower = calculate_sbert_similarity(attr1.lower(), attr2.lower(), model)
         
         results.append({
-            'id': row['ID'],
-            'attribute1': attr1,
-            'attribute2': attr2,
-            'match': row['Match'],
-            'confidence': row.get('Confidence', 'unknown'),
-            'category': row.get('Category', 'unknown'),
-            'type': row.get('Type', 'unknown'),
-            'reasoning': row.get('Reasoning', ''),
+            'ID': row['ID'],
+            'Attribute1': attr1,
+            'Attribute2': attr2,
+            'Match': row['Match'],
+            'Confidence': row.get('Confidence', 'unknown'),
+            'Category': row.get('Category', 'unknown'),
+            'Type': row.get('Type', 'unknown'),
+            'Reasoning': row.get('Reasoning', ''),
             'sbert_similarity': round(sbert_similarity, 4),
             'sbert_similarity_lower': round(sbert_similarity_lower, 4),
             'length_attr1': len(attr1),
@@ -91,7 +92,7 @@ def analyze_pairs(data_file: str, output_csv: str = "data/sbert_results.csv",
             print(f"  Processed {i + 1}/{total_pairs} pairs...")
     
     df = pd.DataFrame(results)
-    df = df.sort_values('id').reset_index(drop=True)
+    df = df.sort_values('ID').reset_index(drop=True)
     
     print(f"\nSaving results to: {output_csv}")
     df.to_csv(output_csv, index=False, encoding='utf-8')
@@ -110,7 +111,7 @@ def analyze_pairs(data_file: str, output_csv: str = "data/sbert_results.csv",
     
     print("Statistics by Match Status:")
     for match_status in [True, False]:
-        subset = df[df['match'] == match_status]
+        subset = df[df['Match'] == match_status]
         label = "MATCHING PAIRS (True)" if match_status else "NON-MATCHING PAIRS (False)"
         print(f"\n  {label}:")
         print(f"    Count: {len(subset)}")
@@ -120,61 +121,61 @@ def analyze_pairs(data_file: str, output_csv: str = "data/sbert_results.csv",
             print(f"    Max similarity: {subset['sbert_similarity'].max():.4f}")
             print(f"    Median similarity: {subset['sbert_similarity'].median():.4f}")
         
-    match_avg = df[df['match'] == True]['sbert_similarity'].mean()
-    non_match_avg = df[df['match'] == False]['sbert_similarity'].mean()
+    match_avg = df[df['Match'] == True]['sbert_similarity'].mean()
+    non_match_avg = df[df['Match'] == False]['sbert_similarity'].mean()
     gap = match_avg - non_match_avg
     print(f"\n  📊 Separation Gap: {gap:.4f} ({gap*100:.2f}%)")
     print(f"     This is how much better SBERT scores matches vs non-matches")
     
     print("\n\nStatistics by Category:")
-    if 'category' in df.columns:
-        category_stats = df.groupby('category').agg({
+    if 'Category' in df.columns:
+        category_stats = df.groupby('Category').agg({
             'sbert_similarity': ['count', 'mean', 'std', 'min', 'max']
         }).round(4)
         print(category_stats)
     
     print("\n\nStatistics by Type:")
-    if 'type' in df.columns:
-        type_stats = df.groupby('type').agg({
+    if 'Type' in df.columns:
+        type_stats = df.groupby('Type').agg({
             'sbert_similarity': ['count', 'mean', 'std']
         }).round(4)
         print(type_stats)
     
     print("\n\nStatistics by Confidence:")
-    if 'confidence' in df.columns:
-        confidence_stats = df.groupby('confidence').agg({
+    if 'Confidence' in df.columns:
+        confidence_stats = df.groupby('Confidence').agg({
             'sbert_similarity': ['count', 'mean', 'std'],
-            'match': 'sum'
+            'Match': 'sum'
         }).round(4)
         print(confidence_stats)
     
     print("\n\n" + "=" * 80)
     print("TOP 10 HIGHEST SIMILARITY (by SBERT)")
     print("=" * 80)
-    top_similar = df.nlargest(10, 'sbert_similarity')[['attribute1', 'attribute2', 'match', 'sbert_similarity', 'category', 'type']]
+    top_similar = df.nlargest(10, 'sbert_similarity')[['Attribute1', 'Attribute2', 'Match', 'sbert_similarity', 'Category', 'Type']]
     print(top_similar.to_string(index=False))
     
     print("\n\n" + "=" * 80)
     print("TOP 10 LOWEST SIMILARITY (by SBERT)")
     print("=" * 80)
-    top_dissimilar = df.nsmallest(10, 'sbert_similarity')[['attribute1', 'attribute2', 'match', 'sbert_similarity', 'category', 'type']]
+    top_dissimilar = df.nsmallest(10, 'sbert_similarity')[['Attribute1', 'Attribute2', 'Match', 'sbert_similarity', 'Category', 'Type']]
     print(top_dissimilar.to_string(index=False))
     
     print("\n\n" + "=" * 80)
     print("CROSS-LINGUAL PAIRS (SBERT's strength!)")
     print("=" * 80)
-    cross_lingual = df[df['type'].str.contains('cross_lingual', na=False) & (df['match'] == True)].nlargest(10, 'sbert_similarity')
+    cross_lingual = df[df['Type'].str.contains('cross_lingual', na=False) & (df['Match'] == True)].nlargest(10, 'sbert_similarity')
     if len(cross_lingual) > 0:
-        print(cross_lingual[['attribute1', 'attribute2', 'sbert_similarity', 'category', 'type']].to_string(index=False))
+        print(cross_lingual[['Attribute1', 'Attribute2', 'sbert_similarity', 'Category', 'Type']].to_string(index=False))
     else:
         print("No cross-lingual pairs found")
     
     print("\n\n" + "=" * 80)
     print("CHALLENGING MATCHES (True matches with LOW SBERT similarity)")
     print("=" * 80)
-    challenging = df[(df['match'] == True) & (df['sbert_similarity'] < 0.7)].nsmallest(10, 'sbert_similarity')
+    challenging = df[(df['Match'] == True) & (df['sbert_similarity'] < 0.7)].nsmallest(10, 'sbert_similarity')
     if len(challenging) > 0:
-        print(challenging[['attribute1', 'attribute2', 'sbert_similarity', 'category', 'reasoning']].to_string(index=False))
+        print(challenging[['Attribute1', 'Attribute2', 'sbert_similarity', 'Category', 'Reasoning']].to_string(index=False))
     else:
         print("No challenging matches found (all true matches have SBERT similarity >= 0.7)")
         print("🎉 SBERT handles everything well!")
@@ -182,9 +183,9 @@ def analyze_pairs(data_file: str, output_csv: str = "data/sbert_results.csv",
     print("\n\n" + "=" * 80)
     print("FALSE FRIENDS (Non-matches with HIGH SBERT similarity)")
     print("=" * 80)
-    false_friends = df[(df['match'] == False) & (df['sbert_similarity'] > 0.7)].nlargest(10, 'sbert_similarity')
+    false_friends = df[(df['Match'] == False) & (df['sbert_similarity'] > 0.7)].nlargest(10, 'sbert_similarity')
     if len(false_friends) > 0:
-        print(false_friends[['attribute1', 'attribute2', 'sbert_similarity', 'category', 'reasoning']].to_string(index=False))
+        print(false_friends[['Attribute1', 'Attribute2', 'sbert_similarity', 'Category', 'Reasoning']].to_string(index=False))
     else:
         print("No false friends found (all non-matches have SBERT similarity <= 0.7)")
         print("🎉 SBERT avoids false positives!")
@@ -203,10 +204,10 @@ def analyze_pairs(data_file: str, output_csv: str = "data/sbert_results.csv",
     for threshold in thresholds:
         df['predicted'] = df['sbert_similarity'] >= threshold
         
-        tp = len(df[(df['predicted'] == True) & (df['match'] == True)])
-        fp = len(df[(df['predicted'] == True) & (df['match'] == False)])
-        tn = len(df[(df['predicted'] == False) & (df['match'] == False)])
-        fn = len(df[(df['predicted'] == False) & (df['match'] == True)])
+        tp = len(df[(df['predicted'] == True) & (df['Match'] == True)])
+        fp = len(df[(df['predicted'] == True) & (df['Match'] == False)])
+        tn = len(df[(df['predicted'] == False) & (df['Match'] == False)])
+        fn = len(df[(df['predicted'] == False) & (df['Match'] == True)])
         
         accuracy = (tp + tn) / len(df) if len(df) > 0 else 0
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
@@ -219,9 +220,9 @@ def analyze_pairs(data_file: str, output_csv: str = "data/sbert_results.csv",
     best_threshold = 0
     for threshold in np.arange(0.5, 1.0, 0.01):
         df['predicted'] = df['sbert_similarity'] >= threshold
-        tp = len(df[(df['predicted'] == True) & (df['match'] == True)])
-        fp = len(df[(df['predicted'] == True) & (df['match'] == False)])
-        fn = len(df[(df['predicted'] == False) & (df['match'] == True)])
+        tp = len(df[(df['predicted'] == True) & (df['Match'] == True)])
+        fp = len(df[(df['predicted'] == True) & (df['Match'] == False)])
+        fn = len(df[(df['predicted'] == False) & (df['Match'] == True)])
         
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0

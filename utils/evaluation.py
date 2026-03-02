@@ -6,7 +6,7 @@ def calculate_metrics(df, similarity_col, threshold=0.5):
     Calculate TP, FP, TN, FN, Accuracy, Precision, Recall, and F1-Score.
     
     Args:
-        df: DataFrame containing 'Match' column and the similarity column.
+        df: DataFrame containing 'Match' or 'match' column and the similarity column.
         similarity_col: Name of the column containing similarity scores.
         threshold: Threshold for classification (default 0.5).
         
@@ -16,8 +16,13 @@ def calculate_metrics(df, similarity_col, threshold=0.5):
     # Ensure we strictly operate on a boolean copy
     predicted = df[similarity_col] >= threshold
     
-    # Handle ground truth column (case insensitive string or boolean)
-    match_col = df['Match']
+    # Handle ground truth column (case insensitive - support both 'Match' and 'match')
+    if 'Match' in df.columns:
+        match_col = df['Match']
+    elif 'match' in df.columns:
+        match_col = df['match']
+    else:
+        raise KeyError("DataFrame must contain either 'Match' or 'match' column")
     
     tp = len(df[(predicted) & (match_col)])
     fp = len(df[(predicted) & (~match_col)])
