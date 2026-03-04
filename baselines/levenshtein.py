@@ -79,7 +79,6 @@ def analyze_pairs(data_file: str, output_csv: str = "data/levenshtein_results.cs
     print("Overall Statistics (Case-Insensitive):")
     print(f"  Total pairs analyzed: {len(df)}")
     print(f"  Average Levenshtein distance: {df['levenshtein_distance'].mean():.2f}")
-    print(f"  Average normalized distance: {df['normalized_distance'].mean():.4f}")
     print(f"  Average similarity score: {df['similarity_score'].mean():.4f}")
     print(f"  Median similarity score: {df['similarity_score'].median():.4f}")
     print(f"  Std dev similarity score: {df['similarity_score'].std():.4f}")
